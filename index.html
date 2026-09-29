@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b1020">
+  <title>Proxy OS — Desktop</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="desktop" id="desktop">
+    <div class="wallpaper-glow glow-one"></div>
+    <div class="wallpaper-glow glow-two"></div>
+
+    <aside class="desktop-icons" aria-label="Desktop shortcuts">
+      <button class="desktop-icon" data-open="browserWindow">
+        <span class="icon-tile browser-icon">🌐</span><span>Web Browser</span>
+      </button>
+      <button class="desktop-icon" data-open="filesWindow">
+        <span class="icon-tile">📁</span><span>File Explorer</span>
+      </button>
+      <button class="desktop-icon" data-open="notesWindow">
+        <span class="icon-tile">📝</span><span>Notepad</span>
+      </button>
+      <button class="desktop-icon" data-open="settingsWindow">
+        <span class="icon-tile">⚙️</span><span>Settings</span>
+      </button>
+      <button class="desktop-icon" data-open="appsWindow">
+        <span class="icon-tile">🧩</span><span>Apps</span>
+      </button>
+    </aside>
+
+    <section class="window browser-window" id="browserWindow" aria-label="Browser window">
+      <header class="titlebar">
+        <div class="window-brand"><span class="brand-mark">◉</span><span>Proxy Browser</span></div>
+        <div class="window-actions">
+          <button class="window-action" data-minimize="browserWindow" aria-label="Minimize">−</button>
+          <button class="window-action" data-maximize="browserWindow" aria-label="Maximize">□</button>
+          <button class="window-action close" data-close="browserWindow" aria-label="Close">×</button>
+        </div>
+      </header>
+      <div class="browser-toolbar">
+        <button class="round-tool" id="backButton" title="Back">‹</button>
+        <button class="round-tool" id="forwardButton" title="Forward">›</button>
+        <button class="round-tool" id="refreshButton" title="Refresh">↻</button>
+        <form class="address-form" id="addressForm">
+          <span class="lock-mark">⌕</span>
+          <input id="addressInput" autocomplete="url" placeholder="Search the web or enter a website address">
+          <button class="go-button" type="submit">Go</button>
+        </form>
+        <button class="round-tool" id="newTabButton" title="New tab">＋</button>
+      </div>
+      <div class="browser-tabs">
+        <button class="browser-tab active" data-tab="homeTab"><span>🌐</span> New tab <span class="tab-x">×</span></button>
+        <button class="browser-tab-add" id="addTabButton">+</button>
+        <span class="tab-spacer"></span>
+        <span class="browser-status"><i class="status-dot"></i> Browser workspace</span>
+      </div>
+      <div class="browser-content" id="homeTab">
+        <div class="welcome">
+          <div class="welcome-badge">✦ YOUR WEB WORKSPACE</div>
+          <h1>Explore <span>without limits.</span></h1>
+          <p class="welcome-sub">A sleek desktop-style web launcher. Search, open sites, and keep your favorite destinations close.</p>
+          <form class="hero-search" id="heroSearch">
+            <span>⌕</span>
+            <input id="heroInput" placeholder="Search Google or enter a URL…" aria-label="Search the web">
+            <button type="submit">Search <b>↗</b></button>
+          </form>
+          <div class="quick-label">QUICK ACCESS</div>
+          <div class="site-grid">
+            <button class="site-card" data-url="https://www.youtube.com"><span class="site-logo youtube">▶</span><b>YouTube</b><small>Videos & creators</small></button>
+            <button class="site-card" data-url="https://www.tiktok.com"><span class="site-logo tiktok">♪</span><b>TikTok</b><small>Short-form videos</small></button>
+            <button class="site-card" data-url="https://www.instagram.com"><span class="site-logo instagram">◎</span><b>Instagram</b><small>Photos & stories</small></button>
+            <button class="site-card" data-url="https://www.reddit.com"><span class="site-logo reddit">●</span><b>Reddit</b><small>Communities</small></button>
+            <button class="site-card" data-url="https://discord.com"><span class="site-logo discord">◈</span><b>Discord</b><small>Chat & hang out</small></button>
+            <button class="site-card" data-url="https://www.twitch.tv"><span class="site-logo twitch">▣</span><b>Twitch</b><small>Live streaming</small></button>
+            <button class="site-card" data-url="https://x.com"><span class="site-logo xlogo">𝕏</span><b>X</b><small>What's happening</small></button>
+            <button class="site-card" data-url="https://www.wikipedia.org"><span class="site-logo wiki">W</span><b>Wikipedia</b><small>Knowledge & learning</small></button>
+          </div>
+          <div class="tip-card"><span class="tip-icon">✧</span><div><b>Heads up</b><p>Some websites block being displayed inside another page. Use “Open in new tab” if a site doesn't load here.</p></div></div>
+        </div>
+      </div>
+      <div class="browser-viewer hidden" id="browserViewer">
+        <div class="viewer-top"><span id="viewerAddress">Ready</span><button id="openExternal">↗ Open in new tab</button></div>
+        <iframe id="webFrame" title="Website preview" referrerpolicy="no-referrer" sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+      </div>
+    </section>
+
+    <section class="window small-window hidden" id="filesWindow">
+      <header class="titlebar"><div class="window-brand">📁 File Explorer</div><div class="window-actions"><button class="window-action" data-minimize="filesWindow">−</button><button class="window-action" data-maximize="filesWindow">□</button><button class="window-action close" data-close="filesWindow">×</button></div></header>
+      <div class="file-layout"><nav class="file-nav"><b>Quick access</b><span>🏠 Home</span><span>🖥️ Desktop</span><span>📄 Documents</span><span>⬇️ Downloads</span><span>🖼️ Pictures</span></nav><div class="file-main"><div class="file-path">Home　›　Desktop</div><div class="file-grid"><div>📁　Projects</div><div>📁　Downloads</div><div>📁　Pictures</div><div>📄　Readme.txt</div></div></div></div>
+    </section>
+
+    <section class="window small-window hidden" id="notesWindow">
+      <header class="titlebar"><div class="window-brand">📝 Notepad</div><div class="window-actions"><button class="window-action" data-minimize="notesWindow">−</button><button class="window-action" data-maximize="notesWindow">□</button><button class="window-action close" data-close="notesWindow">×</button></div></header>
+      <div class="notes-tools"><span>File　 Edit　 View</span><button id="saveNote">Download .txt</button></div>
+      <textarea id="notesText" class="notes-text" placeholder="Start typing your notes here…"></textarea>
+    </section>
+
+    <section class="window small-window hidden" id="settingsWindow">
+      <header class="titlebar"><div class="window-brand">⚙️ Settings</div><div class="window-actions"><button class="window-action" data-minimize="settingsWindow">−</button><button class="window-action" data-maximize="settingsWindow">□</button><button class="window-action close" data-close="settingsWindow">×</button></div></header>
+      <div class="settings-content"><h2>Personalization</h2><p>Choose the desktop accent.</p><div class="accent-options"><button data-accent="#8b5cf6" style="--swatch:#8b5cf6">Violet</button><button data-accent="#0ea5e9" style="--swatch:#0ea5e9">Ocean</button><button data-accent="#10b981" style="--swatch:#10b981">Mint</button><button data-accent="#f97316" style="--swatch:#f97316">Sunset</button></div><div class="settings-note">This is a browser-based desktop simulation, not a full operating system or network proxy.</div></div>
+    </section>
+
+    <section class="window small-window hidden" id="appsWindow">
+      <header class="titlebar"><div class="window-brand">🧩 Apps</div><div class="window-actions"><button class="window-action" data-minimize="appsWindow">−</button><button class="window-action" data-maximize="appsWindow">□</button><button class="window-action close" data-close="appsWindow">×</button></div></header>
+      <div class="apps-content"><h2>Your apps</h2><div class="apps-grid"><button data-open="browserWindow">🌐<b>Browser</b></button><button data-open="filesWindow">📁<b>Files</b></button><button data-open="notesWindow">📝<b>Notepad</b></button><button data-open="settingsWindow">⚙️<b>Settings</b></button></div></div>
+    </section>
+
+    <div class="start-menu hidden" id="startMenu">
+      <div class="start-search">⌕　Search apps, settings, and documents</div>
+      <div class="start-heading"><b>Pinned</b><span>All apps　›</span></div>
+      <div class="pinned-grid">
+        <button data-open="browserWindow">🌐<span>Browser</span></button><button data-open="filesWindow">📁<span>Files</span></button><button data-open="notesWindow">📝<span>Notepad</span></button><button data-open="settingsWindow">⚙️<span>Settings</span></button><button data-open="appsWindow">🧩<span>Apps</span></button>
+      </div>
+      <div class="start-footer"><span>👤　Local user</span><button id="powerButton" title="Close start menu">⏻</button></div>
+    </div>
+
+    <footer class="taskbar">
+      <button class="taskbar-start" id="startButton" title="Start menu"><span class="windows-mark"><i></i><i></i><i></i><i></i></span></button>
+      <button class="taskbar-search" id="taskbarSearch">⌕ <span>Search</span></button>
+      <div class="taskbar-pins"><button data-open="browserWindow" title="Browser">🌐</button><button data-open="filesWindow" title="Files">📁</button><button data-open="notesWindow" title="Notepad">📝</button></div>
+      <div class="taskbar-spacer"></div>
+      <div class="system-tray"><span>⌃</span><span>◉</span><span>◖</span><div class="tray-clock"><b id="clockTime">--:--</b><small id="clockDate">---</small></div></div>
+    </footer>
+  </div>
+  <script src="script.js" defer></script>
+</body>
+</html>
