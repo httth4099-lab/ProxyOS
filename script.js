@@ -41,7 +41,7 @@ function normalizeAddress(raw) {
   if (/^https?:\/\//i.test(value)) return value;
   if (/^(localhost|127\.0\.0\.1)(:\d+)?([/].*)?$/i.test(value)) return "http://" + value;
   if (/^[^\s]+\.[^\s]+$/.test(value)) return "https://" + value;
-  return "https://www.google.com/search?q=" + encodeURIComponent(value);
+  return "https://duckduckgo.com/?q=" + encodeURIComponent(value);
 }
 function navigate(raw) {
   const url = normalizeAddress(raw);
