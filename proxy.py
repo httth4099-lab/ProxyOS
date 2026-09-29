@@ -1,353 +1,166 @@
 
-import json
-import os
-import re
 import socket
-import ipaddress
-from html.parser import HTMLParser
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, urlencode, urljoin
-from urllib.request import Request, build_opener, HTTPRedirectHandler
-
-HOST = "127.0.0.1"
-PORT = 8765
-MAX_DOWNLOAD = 25 * 1024 * 1024
-VERSION = "ProxyOS-2.0"
+import select
+import http.client
+from urllib.parse import urlsplit
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
-# ==========================================
-# SEARCH PARSER
-# ==========================================
+class ProxyHandler(BaseHTTPRequestHandler):
 
-class SearchParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.results = []
-        self.current = None
-        self.in_title = False
-        self.title_parts = []
+    protocol_version = "HTTP/1.1"
 
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        classes = attrs.get("class", "")
-
-        if tag == "a" and (
-            "result__a" in classes
-            or "result-link" in classes
-        ):
-            self.current = {
-                "title": "",
-                "url": attrs.get("href", "")
-            }
-            self.title_parts = []
-            self.in_title = True
-
-    def handle_data(self, data):
-        if self.in_title:
-            self.title_parts.append(data)
-
-    def handle_endtag(self, tag):
-        if tag == "a" and self.in_title and self.current:
-            self.current["title"] = " ".join(
-                "".join(self.title_parts).split()
-            )
-
-            self.results.append(self.current)
-            self.current = None
-            self.in_title = False
-
-
-# ==========================================
-# URL VALIDATION
-# ==========================================
-
-def validate_public_url(url):
-    parsed = urlparse(url)
-
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError("Only HTTP and HTTPS URLs are allowed.")
-
-    if not parsed.hostname:
-        raise ValueError("Invalid URL.")
-
-    if parsed.username or parsed.password:
-        raise ValueError("URLs containing credentials are blocked.")
-
-    try:
-        addresses = socket.getaddrinfo(
-            parsed.hostname,
-            parsed.port or (443 if parsed.scheme == "https" else 80),
-            type=socket.SOCK_STREAM
-        )
-    except OSError:
-        raise ValueError("Could not resolve hostname.")
-
-    for address in addresses:
-        ip = ipaddress.ip_address(address[4][0].split("%")[0])
-
-        if not ip.is_global:
-            raise ValueError("Private and local network addresses are blocked.")
-
-    return url
-
-
-class SafeRedirect(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        target = urljoin(req.full_url, newurl)
-        validate_public_url(target)
-
-        return super().redirect_request(
-            req, fp, code, msg, headers, target
-        )
-
-
-# ==========================================
-# HTTP SERVER
-# ==========================================
-
-class Handler(BaseHTTPRequestHandler):
-
-    def log_message(self, fmt, *args):
-        print("%s - %s" % (
-            self.address_string(),
-            fmt % args
-        ))
-
-    def send_data(
-        self,
-        status,
-        data,
-        content_type="application/json",
-        extra_headers=None
-    ):
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("X-Content-Type-Options", "nosniff")
-
-        for key, value in (extra_headers or {}).items():
-            self.send_header(key, value)
-
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
+    def do_CONNECT(self):
+        """Create a tunnel for HTTPS traffic."""
+        host, _, port = self.path.partition(":")
+        port = int(port or 443)
 
         try:
-            self.wfile.write(data)
-        except (BrokenPipeError, ConnectionResetError):
-            pass
+            with socket.create_connection((host, port), timeout=10) as remote:
+                self.send_response(200, "Connection Established")
+                self.end_headers()
 
-    def send_json(self, status, obj):
-        self.send_data(
-            status,
-            json.dumps(obj).encode("utf-8")
-        )
+                sockets = [self.connection, remote]
 
-    def do_OPTIONS(self):
-        self.send_data(204, b"")
+                while True:
+                    readable, _, exceptional = select.select(
+                        sockets, [], sockets, 60
+                    )
+
+                    if exceptional or not readable:
+                        break
+
+                    for source in readable:
+                        destination = (
+                            remote if source is self.connection
+                            else self.connection
+                        )
+
+                        data = source.recv(65536)
+
+                        if not data:
+                            return
+
+                        destination.sendall(data)
+
+        except Exception as error:
+            print("HTTPS tunnel error:", error)
 
     def do_GET(self):
-        parsed = urlparse(self.path)
-        params = parse_qs(parsed.query)
+        self.forward_request()
 
-        # ======================================
-        # STATUS
-        # ======================================
+    def do_POST(self):
+        self.forward_request()
 
-        if parsed.path == "/":
-            return self.send_json(200, {
-                "status": "running",
-                "version": VERSION
-            })
+    def do_HEAD(self):
+        self.forward_request()
 
-        if parsed.path == "/api/version":
-            return self.send_json(200, {
-                "version": VERSION,
-                "server": "Proxy OS helper"
-            })
+    def do_PUT(self):
+        self.forward_request()
 
-        # ======================================
-        # SEARCH
-        # ======================================
+    def do_DELETE(self):
+        self.forward_request()
 
-        if parsed.path == "/api/search":
-            query = params.get("q", [""])[0].strip()
+    def forward_request(self):
+        """Forward a regular HTTP request."""
+        try:
+            url = urlsplit(self.path)
 
-            if not query:
-                return self.send_json(400, {
-                    "error": "Enter a search query."
-                })
+            if url.scheme != "http" or not url.hostname:
+                self.send_error(400, "Use an absolute HTTP URL")
+                return
 
-            fallback_url = (
-                "https://duckduckgo.com/?"
-                + urlencode({"q": query})
+            host = url.hostname
+            port = url.port or 80
+
+            path = url.path or "/"
+
+            if url.query:
+                path += "?" + url.query
+
+            headers = {
+                key: value
+                for key, value in self.headers.items()
+                if key.lower() not in (
+                    "proxy-connection",
+                    "proxy-authorization",
+                    "connection",
+                    "transfer-encoding",
+                )
+            }
+
+            body = None
+
+            if self.command in ("POST", "PUT"):
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length) if length else None
+
+            connection = http.client.HTTPConnection(
+                host, port, timeout=20
             )
 
-            results = []
-            search_error = None
+            connection.request(
+                self.command,
+                path,
+                body=body,
+                headers=headers,
+            )
 
-            try:
-                search_url = (
-                    "https://html.duckduckgo.com/html/?"
-                    + urlencode({"q": query})
-                )
+            response = connection.getresponse()
 
-                request = Request(
-                    search_url,
-                    headers={
-                        "User-Agent": (
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                            "AppleWebKit/537.36 Chrome/131.0.0.0 "
-                            "Safari/537.36"
-                        ),
-                        "Accept": "text/html"
-                    }
-                )
+            self.send_response(
+                response.status, response.reason
+            )
 
-                with build_opener().open(
-                    request, timeout=20
-                ) as response:
-                    html = response.read(
-                        3_000_000
-                    ).decode("utf-8", "replace")
+            for key, value in response.getheaders():
+                if key.lower() not in (
+                    "transfer-encoding",
+                    "connection",
+                    "keep-alive",
+                ):
+                    self.send_header(key, value)
 
-                parser = SearchParser()
-                parser.feed(html)
+            self.end_headers()
 
-                for item in parser.results:
-                    url = item["url"]
+            if self.command != "HEAD":
+                while True:
+                    data = response.read(65536)
 
-                    if url.startswith("//"):
-                        url = "https:" + url
+                    if not data:
+                        break
 
-                    if url.startswith("/"):
-                        url = urljoin(
-                            "https://html.duckduckgo.com", url
-                        )
+                    self.wfile.write(data)
 
-                    if not url.startswith(("http://", "https://")):
-                        continue
+            connection.close()
 
-                    results.append({
-                        "title": item["title"] or url,
-                        "url": url,
-                        "description": ""
-                    })
+        except Exception as error:
+            print("HTTP forwarding error:", error)
 
-            except Exception as error:
-                search_error = str(error)
-                print("Search error:", search_error)
-
-            # GUARANTEED FALLBACK IF NO RESULTS WERE FOUND
-            if not results:
-                results = [{
-                    "title": "Search DuckDuckGo for " + query,
-                    "url": fallback_url,
-                    "description": (
-                        "No results could be extracted. "
-                        "Click to view the search page."
-                    )
-                }]
-
-            print("Search query:", query)
-            print("Results returned:", len(results))
-
-            return self.send_json(200, {
-                "query": query,
-                "results": results[:20],
-                "count": len(results),
-                "version": VERSION,
-                "fallback": search_error is not None
-            })
-
-        # ======================================
-        # DOWNLOAD
-        # ======================================
-
-        if parsed.path == "/api/download":
-            url = params.get("url", [""])[0]
-
-            try:
-                validate_public_url(url)
-
-                request = Request(
-                    url,
-                    headers={
-                        "User-Agent": "Mozilla/5.0 ProxyOS/2.0"
-                    }
-                )
-
-                with build_opener(
-                    SafeRedirect()
-                ).open(request, timeout=20) as response:
-
-                    data = response.read(MAX_DOWNLOAD + 1)
-
-                    if len(data) > MAX_DOWNLOAD:
-                        return self.send_data(
-                            413,
-                            b"Download exceeds the 25 MB limit.",
-                            "text/plain"
-                        )
-
-                    filename = os.path.basename(
-                        urlparse(response.geturl()).path
-                    ) or "download.bin"
-
-                    filename = re.sub(
-                        r"[^A-Za-z0-9._-]",
-                        "_",
-                        filename
-                    )[:120] or "download.bin"
-
-                    return self.send_data(
-                        200,
-                        data,
-                        response.headers.get_content_type(),
-                        {
-                            "Content-Disposition":
-                                f'attachment; filename="{filename}"'
-                        }
-                    )
-
-            except Exception as error:
-                return self.send_data(
-                    400,
-                    str(error).encode("utf-8"),
-                    "text/plain; charset=utf-8"
-                )
-
-        # ======================================
-        # UNKNOWN ROUTE
-        # ======================================
-
-        return self.send_json(404, {
-            "error": "Not found"
-        })
+            if not self.wfile.closed:
+                try:
+                    self.send_error(502, "Proxy forwarding failed")
+                except Exception:
+                    pass
 
 
-# ==========================================
-# START SERVER
-# ==========================================
+class ProxyServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
 
 if __name__ == "__main__":
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    server = ProxyServer(
+        ("127.0.0.1", 8888),
+        ProxyHandler
+    )
 
-    print("=" * 45)
-    print("          PROXY OS HELPER")
-    print("          VERSION:", VERSION)
-    print("=" * 45)
-    print(f"Server: http://{HOST}:{PORT}")
-    print("Version: /api/version")
-    print("Search: /api/search?q=hello")
-    print("Downloads: /api/download?url=...")
+    print("ProxyOS network proxy is running!")
+    print("Address: 127.0.0.1:8888")
     print("Press Ctrl+C to stop.")
-    print("=" * 45)
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping Proxy OS helper...")
+        print("\nStopping proxy...")
     finally:
         server.server_close()
